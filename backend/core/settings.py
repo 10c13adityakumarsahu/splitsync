@@ -32,6 +32,9 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'unsafe-default-key-for-dev')
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+render_host = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+if render_host:
+    ALLOWED_HOSTS.append(render_host)
 
 
 # Application definition
@@ -174,5 +177,6 @@ cors_env = os.getenv('CORS_ALLOWED_ORIGINS', '')
 if cors_env:
     CORS_ALLOWED_ORIGINS = cors_env.split(',')
 else:
-    # Local fallback
-    CORS_ALLOWED_ORIGINS = ['http://localhost:5173']
+    # If not explicitly set, allow all origins in production to prevent CORS blocks
+    # while the user figures out their frontend domain
+    CORS_ALLOW_ALL_ORIGINS = True
