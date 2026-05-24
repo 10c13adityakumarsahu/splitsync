@@ -8,6 +8,7 @@ import apiClient from '../api/client';
 export default function Signup() {
   const [formData, setFormData] = useState({
     email: '',
+    phone_number: '',
     password: '',
     first_name: '',
     last_name: ''
@@ -93,6 +94,21 @@ export default function Signup() {
               value={formData.email}
               onChange={handleChange}
               placeholder="name@example.com"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <input 
+              name="phone_number"
+              type="tel" 
+              className="input-field" 
+              value={formData.phone_number}
+              onChange={handleChange}
+              placeholder="e.g. 9876543210"
               required
             />
           </div>

@@ -89,15 +89,16 @@ export default function ProfileSetup() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Phone Number (Optional)
+              Phone Number <span className="text-red-500">*</span>
             </label>
             <input 
               name="phone_number"
-              type="text" 
+              type="tel" 
               className="input-field" 
               value={formData.phone_number}
               onChange={handleChange}
               placeholder="e.g. 9876543210"
+              required
             />
           </div>
 
