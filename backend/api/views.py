@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, generics, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from .models import Group, GroupMember, Expense, Settlement, SettlementConfirmation, Contact, ExpenseSplit
@@ -28,14 +29,18 @@ class UserSearchView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
-        email = request.query_params.get('email')
-        if not email:
-            return Response({'error': 'Email parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+        query = request.query_params.get('query') or request.query_params.get('email')
+        if not query:
+            return Response({'error': 'Search query is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
-            target_user = User.objects.get(email__iexact=email)
+            from django.db.models import Q
+            target_user = User.objects.get(Q(email__iexact=query) | Q(phone_number__iexact=query))
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except User.MultipleObjectsReturned:
+            # Handle edge case where multiple match
+            target_user = User.objects.filter(Q(email__iexact=query) | Q(phone_number__iexact=query)).first()
         
         if target_user == request.user:
             return Response({'error': 'You cannot search for yourself'}, status=status.HTTP_400_BAD_REQUEST)
@@ -77,6 +82,8 @@ class GroupViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_member(self, request, pk=None):
         group = self.get_object()
+        if group.members.count() >= 15:
+            return Response({'error': 'Group limit of 15 members reached'}, status=status.HTTP_400_BAD_REQUEST)
         user_id = request.data.get('user_id')
         try:
             user = User.objects.get(id=user_id)
@@ -159,9 +166,20 @@ class ContactViewSet(viewsets.ModelViewSet):
         else:
             serializer.save(user=self.request.user)
 
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
     permission_classes = (permissions.IsAuthenticated,)
+    pagination_class = StandardResultsSetPagination
+
+    def paginate_queryset(self, queryset):
+        if self.request.query_params.get('all') == 'true':
+            return None
+        return super().paginate_queryset(queryset)
 
     def get_queryset(self):
         return Expense.objects.filter(group__members__user=self.request.user).distinct()
@@ -178,6 +196,24 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         expense.is_approved = True
         expense.save()
         return Response({'status': 'Expense approved'})
+
+    @action(detail=True, methods=['post'])
+    def decline(self, request, pk=None):
+        expense = self.get_object()
+        if expense.creator != request.user:
+            return Response({'error': 'Only the creator can decline this expense'}, status=status.HTTP_403_FORBIDDEN)
+        
+        expense.is_approved = False
+        expense.save()
+        return Response({'status': 'Expense declined'})
+
+    def destroy(self, request, *args, **kwargs):
+        expense = self.get_object()
+        if expense.creator != request.user:
+            return Response({'error': 'Only the creator can delete this expense'}, status=status.HTTP_403_FORBIDDEN)
+        
+        self.perform_destroy(expense)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class SettlementViewSet(viewsets.ModelViewSet):
     serializer_class = SettlementSerializer
@@ -217,6 +253,7 @@ class SettlementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def lock(self, request, pk=None):
+        from django.db import transaction
         settlement = self.get_object()
         if request.user != settlement.receiver:
             return Response({'error': 'Only the receiver can lock the settlement'}, status=status.HTTP_403_FORBIDDEN)
@@ -227,7 +264,23 @@ class SettlementViewSet(viewsets.ModelViewSet):
         if not settlement.confirmation.is_confirmed:
             return Response({'error': 'Payment must be confirmed before locking'}, status=status.HTTP_400_BAD_REQUEST)
 
-        settlement.status = 'LOCKED'
-        settlement.save()
-        # Here we would add logic to update actual balances.
+        with transaction.atomic():
+            settlement.status = 'LOCKED'
+            settlement.save()
+            
+            # Logic to update actual balances
+            # We decrease the amount_owed by the payer in their ExpenseSplits in the group
+            splits = ExpenseSplit.objects.filter(expense__group=settlement.group, user=settlement.payer, amount_owed__gt=0).order_by('amount_owed')
+            remaining_settlement = settlement.amount
+            
+            for split in splits:
+                if remaining_settlement <= 0:
+                    break
+                unpaid_owed = split.amount_owed - split.amount_paid
+                if unpaid_owed > 0:
+                    deduction = min(unpaid_owed, remaining_settlement)
+                    split.amount_paid += deduction
+                    split.save()
+                    remaining_settlement -= deduction
+
         return Response({'status': 'Settlement locked'})

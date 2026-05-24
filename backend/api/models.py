@@ -22,6 +22,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     upi_id = models.CharField(max_length=100, blank=True, null=True)
     upi_number = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
     preferred_upi_app = models.CharField(max_length=50, blank=True, null=True, choices=[
         ('gpay', 'Google Pay'),
         ('phonepe', 'PhonePe'),

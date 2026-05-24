@@ -70,7 +70,7 @@ export default function AddPersonModal({ isOpen, onClose, onSuccess }) {
                 className="input-field" 
                 value={searchEmail}
                 onChange={e => setSearchEmail(e.target.value)}
-                placeholder="Search by email..."
+                placeholder="Search by email or mobile number..."
               />
               <button type="submit" disabled={searchLoading} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200">
                 <Search size={20} />

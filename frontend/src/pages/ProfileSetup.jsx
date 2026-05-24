@@ -11,6 +11,7 @@ export default function ProfileSetup() {
   const [formData, setFormData] = useState({
     upi_id: user?.upi_id || '',
     upi_number: user?.upi_number || '',
+    phone_number: user?.phone_number || '',
     preferred_upi_app: user?.preferred_upi_app || 'gpay'
   });
   const [saving, setSaving] = useState(false);
@@ -81,6 +82,20 @@ export default function ProfileSetup() {
               type="text" 
               className="input-field" 
               value={formData.upi_number}
+              onChange={handleChange}
+              placeholder="e.g. 9876543210"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Phone Number (Optional)
+            </label>
+            <input 
+              name="phone_number"
+              type="text" 
+              className="input-field" 
+              value={formData.phone_number}
               onChange={handleChange}
               placeholder="e.g. 9876543210"
             />

@@ -26,7 +26,7 @@ export default function Dashboard() {
         const [groupsRes, contactsRes, expensesRes] = await Promise.all([
           apiClient.get('groups/'),
           apiClient.get('contacts/'),
-          apiClient.get('expenses/')
+          apiClient.get('expenses/?all=true')
         ]);
         setGroups(groupsRes.data);
         

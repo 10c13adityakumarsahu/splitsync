@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import PublicSettlement from './pages/PublicSettlement';
 import GroupDetails from './pages/GroupDetails';
 import AddExpense from './pages/AddExpense';
+import BottomNav from './components/BottomNav';
 
 const queryClient = new QueryClient();
 
@@ -22,12 +23,24 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Conditional Root Wrapper
 const ConditionalRoot = () => {
   const { user, loading } = useAuth();
   if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
   if (!user) return <Landing />;
-  return <Dashboard />;
+  return (
+    <LayoutWithNav>
+      <Dashboard />
+    </LayoutWithNav>
+  );
+};
+
+const LayoutWithNav = ({ children }) => {
+  return (
+    <div className="pb-16">
+      {children}
+      <BottomNav />
+    </div>
+  );
 };
 
 function App() {
@@ -47,7 +60,9 @@ function App() {
                 path="/profile-setup" 
                 element={
                   <ProtectedRoute>
-                    <ProfileSetup />
+                    <LayoutWithNav>
+                      <ProfileSetup />
+                    </LayoutWithNav>
                   </ProtectedRoute>
                 } 
               />
@@ -63,7 +78,9 @@ function App() {
                 path="/groups/:id" 
                 element={
                   <ProtectedRoute>
-                    <GroupDetails />
+                    <LayoutWithNav>
+                      <GroupDetails />
+                    </LayoutWithNav>
                   </ProtectedRoute>
                 } 
               />
@@ -71,7 +88,9 @@ function App() {
                 path="/groups/:id/add-expense" 
                 element={
                   <ProtectedRoute>
-                    <AddExpense />
+                    <LayoutWithNav>
+                      <AddExpense />
+                    </LayoutWithNav>
                   </ProtectedRoute>
                 } 
               />

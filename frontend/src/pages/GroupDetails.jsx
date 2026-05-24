@@ -19,10 +19,12 @@ export default function GroupDetails() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterWhoPaid, setFilterWhoPaid] = useState('All');
-  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('Unsettled');
 
   const [loading, setLoading] = useState(true);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [nextPageUrl, setNextPageUrl] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchGroupData = async () => {
     try {
@@ -32,12 +34,33 @@ export default function GroupDetails() {
         apiClient.get('contacts/')
       ]);
       setGroup(groupRes.data);
-      setExpenses(expensesRes.data);
+      if (expensesRes.data.results) {
+        setExpenses(expensesRes.data.results);
+        setNextPageUrl(expensesRes.data.next);
+      } else {
+        setExpenses(expensesRes.data);
+      }
       setContacts(contactsRes.data);
     } catch (error) {
       console.error("Failed to fetch group details");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMoreExpenses = async () => {
+    if (!nextPageUrl) return;
+    setLoadingMore(true);
+    try {
+      // Create a relative URL from the absolute next URL
+      const relativeUrl = nextPageUrl.split('/api/')[1];
+      const res = await apiClient.get(relativeUrl);
+      setExpenses([...expenses, ...res.data.results]);
+      setNextPageUrl(res.data.next);
+    } catch (error) {
+      console.error("Failed to load more expenses", error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -55,6 +78,28 @@ export default function GroupDetails() {
     } catch (err) {
       console.error(err);
       alert('Failed to approve expense');
+    }
+  };
+
+  const handleDecline = async (expenseId) => {
+    try {
+      if (!window.confirm('Are you sure you want to decline this expense?')) return;
+      await apiClient.post(`expenses/${expenseId}/decline/`);
+      setExpenses(expenses.map(e => e.id === expenseId ? { ...e, is_approved: false } : e));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to decline expense');
+    }
+  };
+
+  const handleDelete = async (expenseId) => {
+    try {
+      if (!window.confirm('Are you sure you want to delete this expense?')) return;
+      await apiClient.delete(`expenses/${expenseId}/`);
+      setExpenses(expenses.filter(e => e.id !== expenseId));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete expense');
     }
   };
 
@@ -229,7 +274,7 @@ export default function GroupDetails() {
                   className="bg-white p-4 rounded-2xl flex items-center justify-between border border-slate-100 shadow-sm"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
                       {getCategoryIcon(expense.category)}
                     </div>
                     <div>
@@ -253,24 +298,44 @@ export default function GroupDetails() {
                         </>
                       )}
                       
-                      {!expense.is_approved && (
-                        <div className="flex items-center gap-2 mt-1">
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {new Date(expense.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {!expense.is_approved && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 text-[10px] font-bold border border-orange-100">
                             <Clock size={10} /> Pending
                           </span>
-                          {expense.paid_by?.id === user?.id && (
-                            <button 
-                              onClick={() => handleApprove(expense.id)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-[10px] font-bold border border-emerald-100 transition-colors"
-                            >
-                              <Check size={10} /> Approve
-                            </button>
-                          )}
-                        </div>
-                      )}
+                        )}
+                        {!expense.is_approved && expense.paid_by?.id === user?.id && (
+                          <button 
+                            onClick={() => handleApprove(expense.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-[10px] font-bold border border-emerald-100 transition-colors"
+                          >
+                            <Check size={10} /> Approve
+                          </button>
+                        )}
+                        {expense.creator?.id === user?.id && expense.is_approved && expense.category !== 'Settlement' && (
+                          <button 
+                            onClick={() => handleDecline(expense.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 hover:bg-orange-100 text-[10px] font-bold border border-orange-100 transition-colors"
+                          >
+                            Decline
+                          </button>
+                        )}
+                        {expense.creator?.id === user?.id && (
+                          <button 
+                            onClick={() => handleDelete(expense.id)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold border border-red-100 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right flex flex-col items-end">
+                  <div className="text-right flex flex-col items-end shrink-0">
                     <p className={`text-xs font-medium mb-0.5 ${stake.color}`}>{stake.text}</p>
                     {stake.amount > 0 && <p className={`font-bold ${stake.color}`}>₹{stake.amount.toFixed(2)}</p>}
                     {!expense.is_approved && <p className="text-[10px] text-slate-400 mt-1">unsettled</p>}
@@ -278,6 +343,18 @@ export default function GroupDetails() {
                 </motion.div>
               );
             })
+          )}
+          
+          {nextPageUrl && (
+            <div className="text-center pt-4 pb-8">
+              <button 
+                onClick={fetchMoreExpenses}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-300 transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading...' : 'Load More Transactions'}
+              </button>
+            </div>
           )}
         </div>
       </div>

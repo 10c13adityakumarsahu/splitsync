@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, CheckCircle2, Circle } from 'lucide-react';
 import apiClient from '../api/client';
@@ -12,6 +13,7 @@ export default function Signup() {
     last_name: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const password = formData.password;
@@ -34,8 +36,8 @@ export default function Signup() {
     }
     try {
       await apiClient.post('auth/register/', formData);
-      alert('Account created! Please log in.');
-      navigate('/login');
+      await login(formData.email, formData.password);
+      navigate('/profile-setup');
     } catch (error) {
       console.error('Signup failed', error);
       alert('Signup failed. Please try again.');
