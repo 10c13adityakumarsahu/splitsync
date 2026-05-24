@@ -36,7 +36,7 @@ const ConditionalRoot = () => {
 
 const LayoutWithNav = ({ children }) => {
   return (
-    <div className="pb-16">
+    <div className="pb-28">
       {children}
       <BottomNav />
     </div>

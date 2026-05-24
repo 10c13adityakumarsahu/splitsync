@@ -66,9 +66,14 @@ export default function GroupDetails() {
 
   useEffect(() => {
     fetchGroupData();
+    const intervalId = setInterval(() => {
+      fetchGroupData();
+    }, 5000); // Poll every 5 seconds
+    
+    return () => clearInterval(intervalId);
   }, [id]);
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (loading && !group) return <div className="p-8 text-center">Loading...</div>;
   if (!group) return <div className="p-8 text-center text-red-500">Group not found</div>;
 
   const handleApprove = async (expenseId) => {
@@ -120,6 +125,11 @@ export default function GroupDetails() {
     if (filterStatus === 'Unsettled' && exp.is_approved) return false;
     return true;
   });
+
+  const isUserInvolved = (expense) => {
+    if (expense.creator?.id === user?.id || expense.paid_by?.id === user?.id) return true;
+    return expense.splits?.some(s => s.user?.id === user?.id || s.user === user?.id);
+  };
 
   const getCategoryIcon = (cat) => {
     switch(cat) {
@@ -316,7 +326,7 @@ export default function GroupDetails() {
                             <Check size={10} /> Approve
                           </button>
                         )}
-                        {expense.creator?.id === user?.id && expense.is_approved && expense.category !== 'Settlement' && (
+                        {isUserInvolved(expense) && expense.is_approved && expense.category !== 'Settlement' && (
                           <button 
                             onClick={() => handleDecline(expense.id)}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 hover:bg-orange-100 text-[10px] font-bold border border-orange-100 transition-colors"
@@ -324,7 +334,7 @@ export default function GroupDetails() {
                             Decline
                           </button>
                         )}
-                        {expense.creator?.id === user?.id && (
+                        {isUserInvolved(expense) && (
                           <button 
                             onClick={() => handleDelete(expense.id)}
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-600 hover:bg-red-100 text-[10px] font-bold border border-red-100 transition-colors"
@@ -360,7 +370,7 @@ export default function GroupDetails() {
       </div>
 
       {/* Floating Add Button */}
-      <div className="fixed bottom-6 right-6">
+      <div className="fixed bottom-24 right-6 z-40">
         <motion.button 
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}

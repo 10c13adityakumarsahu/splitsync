@@ -197,11 +197,16 @@ class ExpenseViewSet(viewsets.ModelViewSet):
         expense.save()
         return Response({'status': 'Expense approved'})
 
+    def _is_user_involved(self, expense, user):
+        if expense.creator == user or expense.paid_by == user:
+            return True
+        return expense.splits.filter(user=user).exists()
+
     @action(detail=True, methods=['post'])
     def decline(self, request, pk=None):
         expense = self.get_object()
-        if expense.creator != request.user:
-            return Response({'error': 'Only the creator can decline this expense'}, status=status.HTTP_403_FORBIDDEN)
+        if not self._is_user_involved(expense, request.user):
+            return Response({'error': 'Only involved users can decline this expense'}, status=status.HTTP_403_FORBIDDEN)
         
         expense.is_approved = False
         expense.save()
@@ -209,8 +214,8 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         expense = self.get_object()
-        if expense.creator != request.user:
-            return Response({'error': 'Only the creator can delete this expense'}, status=status.HTTP_403_FORBIDDEN)
+        if not self._is_user_involved(expense, request.user):
+            return Response({'error': 'Only involved users can delete this expense'}, status=status.HTTP_403_FORBIDDEN)
         
         self.perform_destroy(expense)
         return Response(status=status.HTTP_204_NO_CONTENT)
